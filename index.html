@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Lab Cash Challenge</title>
+<style>
+  :root{
+    --bg:#0b1020;
+    --panel:#121a31;
+    --panel2:#17213d;
+    --text:#f7f9ff;
+    --muted:#9aa7c7;
+    --green:#38d98a;
+    --green2:#1ca466;
+    --red:#ff6b6b;
+    --gold:#ffcf5a;
+    --blue:#6da8ff;
+    --line:#273455;
+    --shadow:0 18px 60px rgba(0,0,0,.32);
+    --radius:22px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    min-height:100vh;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(109,168,255,.14), transparent 28%),
+      radial-gradient(circle at 90% 10%, rgba(56,217,138,.12), transparent 24%),
+      var(--bg);
+    color:var(--text);
+  }
+  button,input,select,textarea{font:inherit}
+  button{cursor:pointer}
+  .app{max-width:1440px;margin:auto;padding:22px}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:18px;
+    padding:18px 20px;border:1px solid var(--line);border-radius:24px;background:rgba(18,26,49,.88);
+    backdrop-filter:blur(14px);box-shadow:var(--shadow);position:sticky;top:12px;z-index:40;
+  }
+  .brand{display:flex;align-items:center;gap:14px}
+  .logo{
+    width:48px;height:48px;border-radius:16px;display:grid;place-items:center;font-size:26px;
+    background:linear-gradient(135deg,var(--green),#6df3be);color:#052015;font-weight:900;box-shadow:0 10px 24px rgba(56,217,138,.24);
+  }
+  .brand h1{font-size:18px;margin:0}
+  .brand p{font-size:12px;margin:3px 0 0;color:var(--muted)}
+  .top-actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+  .btn{
+    border:1px solid var(--line);background:#182341;color:white;padding:10px 14px;border-radius:14px;font-weight:750;
+    transition:.18s transform,.18s background,.18s border;
+  }
+  .btn:hover{transform:translateY(-1px);background:#1e2c51}
+  .btn.primary{background:linear-gradient(135deg,var(--green2),var(--green));color:#07160f;border:none}
+  .btn.danger{background:#3b1d2a;border-color:#6a2a42;color:#ffd9e4}
+  .btn.gold{background:#3a2e10;border-color:#6a5517;color:#ffe79d}
+  .layout{
+    margin-top:18px;display:grid;grid-template-columns:260px minmax(0,1fr) 310px;gap:18px;align-items:start
+  }
+  .panel{
+    background:linear-gradient(180deg,rgba(20,30,56,.96),rgba(15,23,44,.98));
+    border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+  }
+  .side{padding:16px;position:sticky;top:104px}
+  .section-title{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.11em;font-weight:800;margin:4px 0 10px}
+  .navbtn{
+    width:100%;text-align:left;border:none;background:transparent;color:#c6d0ec;padding:12px 12px;border-radius:13px;font-weight:700;margin-bottom:5px;
+  }
+  .navbtn.active,.navbtn:hover{background:#1c294a;color:white}
+  .lab-list{display:flex;flex-direction:column;gap:8px}
+  .lab-pill{
+    border:1px solid var(--line);background:#121c35;color:white;border-radius:14px;padding:12px;text-align:left;
+  }
+  .lab-pill.active{border-color:rgba(56,217,138,.55);background:rgba(56,217,138,.10)}
+  .lab-pill small{display:block;color:var(--muted);margin-top:3px}
+  .main{padding:20px;min-height:650px}
+  .hero{
+    padding:20px;border-radius:20px;background:linear-gradient(135deg,rgba(109,168,255,.14),rgba(56,217,138,.09));
+    border:1px solid var(--line);display:flex;justify-content:space-between;gap:16px;align-items:center
+  }
+  .hero h2{margin:0 0 6px;font-size:25px}
+  .hero p{margin:0;color:var(--muted)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;min-width:320px}
+  .stat{background:#10182e;border:1px solid var(--line);border-radius:15px;padding:12px;text-align:center}
+  .stat b{font-size:21px;display:block}
+  .stat span{font-size:11px;color:var(--muted)}
+  .cards{
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:18px;margin-top:22px
+  }
+  .money-card{
+    min-height:240px;border:0;border-radius:22px;padding:0;perspective:1000px;background:transparent;color:inherit
+  }
+  .money-card[disabled]{cursor:not-allowed;opacity:.55}
+  .card-inner{
+    position:relative;width:100%;height:240px;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.2,.75,.15,1);
+  }
+  .money-card.revealed .card-inner{transform:rotateY(180deg)}
+  .face{
+    position:absolute;inset:0;backface-visibility:hidden;border-radius:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    overflow:hidden;border:1px solid rgba(255,255,255,.10);box-shadow:0 20px 46px rgba(0,0,0,.28)
+  }
+  .front{
+    background:
+      linear-gradient(135deg,rgba(255,255,255,.11),transparent 30%),
+      repeating-linear-gradient(45deg, rgba(255,255,255,.028) 0 9px, transparent 9px 18px),
+      linear-gradient(135deg,#1d734e,#29a56d);
+  }
+  .front:before,.front:after{
+    content:"";position:absolute;border:2px solid rgba(255,255,255,.19);border-radius:15px
+  }
+  .front:before{inset:13px}
+  .front:after{inset:22px}
+  .question-mark{font-size:84px;font-weight:950;line-height:1;text-shadow:0 8px 20px rgba(0,0,0,.25)}
+  .front .hint{font-size:12px;text-transform:uppercase;letter-spacing:.12em;font-weight:900;margin-top:8px}
+  .back{
+    transform:rotateY(180deg);background:
+      radial-gradient(circle at top right,rgba(255,207,90,.18),transparent 38%),
+      linear-gradient(160deg,#182645,#11192e);padding:18px;text-align:center;justify-content:space-between
+  }
+  .value{
+    display:inline-grid;place-items:center;min-width:88px;height:48px;border-radius:16px;padding:0 16px;background:#143f2e;color:#92f2c0;
+    font-size:27px;font-weight:950;margin-top:8px;border:1px solid rgba(56,217,138,.35)
+  }
+  .qtext{font-size:16px;font-weight:750;line-height:1.42}
+  .used-tag{font-size:11px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+  .empty{
+    margin-top:22px;padding:50px 20px;text-align:center;border:1px dashed var(--line);border-radius:20px;color:var(--muted)
+  }
+  .right{padding:16px;position:sticky;top:104px}
+  .score-list{display:flex;flex-direction:column;gap:9px}
+  .score-row{
+    display:grid;grid-template-columns:34px 1fr auto;gap:9px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:14px;background:#111a31
+  }
+  .rank{width:30px;height:30px;border-radius:10px;display:grid;place-items:center;background:#1a294a;color:#a8baf0;font-weight:900}
+  .student-name{font-weight:800;font-size:13px}
+  .student-id{font-size:11px;color:var(--muted)}
+  .cash{color:#7cebb2;font-weight:950}
+  .tabs{display:flex;gap:8px;margin:20px 0 4px;flex-wrap:wrap}
+  .tab{border:1px solid var(--line);background:#111a31;color:#c4ceea;padding:9px 13px;border-radius:13px;font-weight:800}
+  .tab.active{background:#24355e;color:#fff}
+  .table-wrap{overflow:auto;margin-top:14px;border:1px solid var(--line);border-radius:16px}
+  table{width:100%;border-collapse:collapse;min-width:650px}
+  th,td{padding:12px;border-bottom:1px solid var(--line);text-align:left}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);background:#10182d}
+  td{font-size:13px}
+  .smallbtn{border:1px solid var(--line);background:#182441;color:white;padding:7px 10px;border-radius:10px;font-size:12px;font-weight:750}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:750}
+  .field input,.field textarea,.field select{
+    width:100%;border:1px solid var(--line);background:#0f172c;color:white;border-radius:13px;padding:11px 12px;outline:none
+  }
+  .field textarea{min-height:90px;resize:vertical}
+  .field input:focus,.field textarea:focus{border-color:#557ec0}
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(3,6,14,.75);display:none;align-items:center;justify-content:center;padding:18px;z-index:100;
+    backdrop-filter:blur(8px)
+  }
+  .modal-backdrop.show{display:flex}
+  .modal{
+    width:min(620px,100%);background:#111a31;border:1px solid var(--line);border-radius:24px;padding:20px;box-shadow:var(--shadow);
+    max-height:90vh;overflow:auto
+  }
+  .modal h3{margin:0 0 4px;font-size:23px}
+  .modal p{margin:0 0 18px;color:var(--muted)}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+  .active-student{
+    margin:14px 0;padding:12px 14px;border:1px solid rgba(109,168,255,.28);background:rgba(109,168,255,.08);border-radius:15px
+  }
+  .active-student b{display:block}
+  .active-student span{font-size:12px;color:var(--muted)}
+  .answer-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+  .answer-btn{
+    padding:16px;border-radius:16px;border:none;font-size:16px;font-weight:900
+  }
+  .correct{background:linear-gradient(135deg,#1aa264,#42e195);color:#06160e}
+  .wrong{background:linear-gradient(135deg,#a8374d,#ff6b6b);color:#2d060d}
+  .overlay-celebrate{
+    position:fixed;inset:0;pointer-events:none;display:none;z-index:140;overflow:hidden
+  }
+  .overlay-celebrate.show{display:block}
+  .celebrate-center{
+    position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);font-size:clamp(42px,7vw,88px);font-weight:1000;
+    text-shadow:0 10px 40px rgba(0,0,0,.55);animation:pop .9s ease both;text-align:center
+  }
+  @keyframes pop{0%{transform:translate(-50%,-50%) scale(.2);opacity:0}55%{transform:translate(-50%,-50%) scale(1.15);opacity:1}100%{transform:translate(-50%,-50%) scale(1)}}
+  .confetti{position:absolute;width:10px;height:18px;top:-30px;animation:fall 2.2s linear forwards}
+  @keyframes fall{to{transform:translateY(110vh) rotate(900deg)}}
+  .toast{
+    position:fixed;right:22px;bottom:22px;background:#10182d;border:1px solid var(--line);color:white;border-radius:14px;padding:12px 15px;z-index:180;
+    box-shadow:var(--shadow);transform:translateY(20px);opacity:0;transition:.25s
+  }
+  .toast.show{transform:none;opacity:1}
+  .badge{padding:5px 8px;border-radius:999px;font-size:11px;font-weight:850;background:#1b2949;color:#b9c8f3}
+  .manage-card{padding:15px;border:1px solid var(--line);background:#111a31;border-radius:16px;margin-top:12px}
+  .manage-card h4{margin:0 0 6px}
+  .manage-card p{margin:0;color:var(--muted);font-size:12px}
+  .inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .mobilebar{display:none}
+  .restart-inline{margin-top:14px}
+  .lab-switcher{
+    margin-top:16px;padding:12px;border:1px solid var(--line);border-radius:16px;
+    background:rgba(10,16,32,.48)
+  }
+  .lab-switcher label{
+    display:block;font-size:11px;color:var(--muted);font-weight:850;
+    text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px
+  }
+  .lab-switcher select{
+    width:100%;background:#0f172c;color:white;border:1px solid #344668;
+    border-radius:13px;padding:12px;font-weight:800;outline:none
+  }
+  .manage-labs-list{display:flex;flex-direction:column;gap:9px;margin-top:12px}
+  .manage-lab-row{
+    display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
+    padding:12px;border:1px solid var(--line);border-radius:14px;background:#0f182d
+  }
+  .manage-lab-row.current{border-color:rgba(56,217,138,.55);background:rgba(56,217,138,.08)}
+  .manage-lab-row b{display:block}
+  .manage-lab-row small{color:var(--muted)}
+  .manage-lab-actions{display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end}
+  .current-dot{color:#7cebb2;font-size:11px;font-weight:900;margin-left:6px}
+  @media(max-width:1060px){
+    .layout{grid-template-columns:220px 1fr}
+    .right{grid-column:1/-1;position:static}
+  }
+  @media(max-width:760px){
+    .app{padding:10px}
+    .topbar{top:6px;padding:12px}
+    .brand p{display:none}
+    .layout{display:block}
+    .side{position:static;margin-bottom:12px}
+    .main{padding:14px}
+    .right{margin-top:12px}
+    .hero{display:block}
+    .stats{min-width:0;margin-top:14px}
+    .form-grid{grid-template-columns:1fr}
+    .cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+    .card-inner{height:210px}.money-card{min-height:210px}
+    .qtext{font-size:14px}
+  }
+  @media(max-width:460px){
+    .cards{grid-template-columns:1fr}
+    .top-actions .btn{display:none}
+    .top-actions .btn.primary{display:inline-flex}
+    .restart-inline{display:inline-flex;width:100%;justify-content:center;margin-top:14px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="storageWarn" style="display:none;margin-bottom:10px;padding:12px 14px;border-radius:14px;border:1px solid #6a5517;background:#3a2e10;color:#ffe79d;font-weight:700;font-size:13px">
+    ⚠ This browser is blocking saving. Your labs and questions work now, but they will disappear when you close this page. Open this file in Chrome to keep them.
+  </div>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">$</div>
+      <div><h1>Lab Cash Challenge</h1><p>Answer correctly. Build your lab bank.</p></div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" onclick="openStudentModal()">+ Student</button>
+      <button class="btn gold" onclick="restartBoard()">Restart for New Group</button>
+      <button class="btn primary" onclick="openManageModal()">Instructor Tools</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="panel side">
+      <div class="section-title">Navigation</div>
+      <button id="navGame" class="navbtn active" onclick="showView('game')">🎮 Game Board</button>
+      <button id="navStudents" class="navbtn" onclick="showView('students')">👤 Student Accounts</button>
+      <button id="navScores" class="navbtn" onclick="showView('scores')">🏆 Live Score</button>
+
+      <div class="section-title" style="margin-top:20px">Labs</div>
+      <div id="labList" class="lab-list"></div>
+    </aside>
+
+    <main class="panel main">
+      <section id="gameView">
+        <div class="hero">
+          <div>
+            <div class="inline">
+              <span class="badge">CURRENT LAB</span>
+              <span id="roundBadge" class="badge">Group Round 1</span>
+            </div>
+            <h2 id="labTitle">Lab 1</h2>
+            <p id="labSub">Choose a student, then let them pick a mystery dollar card.</p>
+            <div class="lab-switcher">
+              <label for="labSelector">Choose / open a lab</label>
+              <select id="labSelector" onchange="switchLab(this.value)"></select>
+            </div>
+            <button class="btn gold restart-inline" onclick="restartBoard()">↻ Restart for New Group</button>
+          </div>
+          <div class="stats">
+            <div class="stat"><b id="statQuestions">0</b><span>Questions</span></div>
+            <div class="stat"><b id="statRemaining">0</b><span>Remaining</span></div>
+            <div class="stat"><b id="statStudents">0</b><span>Students</span></div>
+          </div>
+        </div>
+
+        <div class="active-student" id="activeStudentBox">
+          <span>Active student</span>
+          <b>No student selected</b>
+          <span>Select a student before opening a card.</span>
+        </div>
+
+        <div id="cards" class="cards"></div>
+        <div id="emptyBoard" class="empty" style="display:none">No questions in this lab yet. Use Instructor Tools to add some.</div>
+      </section>
+
+      <section id="studentsView" style="display:none">
+        <div class="hero">
+          <div><span class="badge">ACCOUNTS</span><h2>Student Bank Accounts</h2><p>Create a student once, then keep their winnings across lab rounds.</p></div>
+          <button class="btn primary" onclick="openStudentModal()">+ Create Student Account</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Student ID</th><th>Name</th><th>Balance</th><th>Answers</th><th>Action</th></tr></thead>
+            <tbody id="studentsTable"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="scoresView" style="display:none">
+        <div class="hero">
+          <div><span class="badge">LIVE</span><h2>Live Scoreboard</h2><p>Balances update immediately after each correct answer.</p></div>
+          <button class="btn" onclick="toggleFullscreen()">⛶ Full Screen</button>
+        </div>
+        <div id="bigScoreList" class="score-list" style="margin-top:18px"></div>
+      </section>
+    </main>
+
+    <aside class="panel right">
+      <div class="inline" style="justify-content:space-between">
+        <div class="section-title" style="margin:0">Live Score</div>
+        <span class="badge" id="studentCountBadge">0 students</span>
+      </div>
+      <div id="scoreList" class="score-list" style="margin-top:12px"></div>
+    </aside>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="studentModal">
+  <div class="modal">
+    <h3>Create Student Account</h3>
+    <p>Add the student name and ID before they play.</p>
+    <div class="form-grid">
+      <div class="field"><label>Student name</label><input id="studentName" placeholder="e.g. Mariam Ahmed"></div>
+      <div class="field"><label>Student ID</label><input id="studentId" placeholder="e.g. 2301045"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('studentModal')">Cancel</button>
+      <button class="btn primary" onclick="createStudent()">Create Account</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="pickStudentModal">
+  <div class="modal">
+    <h3>Who is playing?</h3>
+    <p>Select the student before revealing the question.</p>
+    <div class="field">
+      <label>Student account</label>
+      <select id="pickStudentSelect"></select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('pickStudentModal')">Cancel</button>
+      <button class="btn primary" onclick="confirmStudentSelection()">Select Student</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="questionModal">
+  <div class="modal">
+    <div class="inline" style="justify-content:space-between">
+      <span class="badge" id="questionLabBadge">LAB</span>
+      <div class="value" id="questionValue">$0</div>
+    </div>
+    <h3 style="margin-top:18px">Question</h3>
+    <p id="questionText" style="font-size:20px;color:white;line-height:1.45;font-weight:800"></p>
+    <div class="active-student" id="questionStudent"></div>
+    <div class="answer-actions">
+      <button class="answer-btn wrong" onclick="gradeAnswer(false)">✕ False / Incorrect</button>
+      <button class="answer-btn correct" onclick="gradeAnswer(true)">✓ Correct Answer</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="manageModal">
+  <div class="modal">
+    <h3>Instructor Tools</h3>
+    <p>Select the lab you want to edit, then add or remove questions for that lab.</p>
+
+    <div class="manage-card">
+      <h4>Edit a lab</h4>
+      <p>Choose exactly which lab you want to manage.</p>
+      <div class="field" style="margin-top:12px">
+        <label for="manageLabSelector">Lab to edit</label>
+        <select id="manageLabSelector" onchange="selectLabForEditing(this.value)"></select>
+      </div>
+    </div>
+
+    <div class="manage-card">
+      <div class="inline" style="justify-content:space-between">
+        <div>
+          <h4 style="margin-bottom:4px">My Labs</h4>
+          <p>All labs you create appear here. Tap Open to work on a lab.</p>
+        </div>
+        <span class="badge" id="manageLabCount">0 labs</span>
+      </div>
+      <div id="manageLabsList" class="manage-labs-list"></div>
+    </div>
+
+    <div class="manage-card">
+      <h4>Create a new lab</h4>
+      <div class="form-grid" style="margin-top:12px">
+        <div class="field"><label>Lab name</label><input id="newLabName" placeholder="e.g. Lab 2"></div>
+        <div class="field"><label>Short note</label><input id="newLabNote" placeholder="e.g. Plant microscopy"></div>
+      </div>
+      <div class="modal-actions"><button class="btn primary" onclick="createLab()">+ Create Lab</button></div>
+    </div>
+
+    <div class="manage-card">
+      <h4>Add question</h4>
+      <div class="field" style="margin-top:12px">
+        <label for="questionLabSelector">Add this question to</label>
+        <select id="questionLabSelector" onchange="selectLabForEditing(this.value)"></select>
+      </div>
+      <p id="manageCurrentLab" style="margin-top:10px"></p>
+      <div class="field" style="margin-top:12px"><label>Question</label><textarea id="newQuestionText" placeholder="Type the question"></textarea></div>
+      <div class="field" style="margin-top:10px"><label>Dollar value</label><input id="newQuestionValue" type="number" min="1" step="1" placeholder="e.g. 5"></div>
+      <div class="modal-actions"><button class="btn primary" onclick="addQuestion()">+ Add Question</button></div>
+    </div>
+
+    <div class="manage-card">
+      <h4>Current questions</h4>
+      <div id="manageQuestions"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('manageModal')">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="accountModal">
+  <div class="modal">
+    <h3 id="accountTitle">Student Account</h3>
+    <p id="accountMeta"></p>
+    <div class="hero" style="padding:16px">
+      <div><span class="badge">BANK BALANCE</span><h2 id="accountBalance" style="margin-top:6px">$0</h2></div>
+      <div id="accountStats"></div>
+    </div>
+    <div class="section-title" style="margin-top:18px">Transaction History</div>
+    <div id="accountHistory"></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('accountModal')">Close</button></div>
+  </div>
+</div>
+
+<div class="overlay-celebrate" id="celebration">
+  <div class="celebrate-center">🎉 CORRECT! 🎉<div id="celebrateCash" style="font-size:.38em;color:#86f3bb;margin-top:8px"></div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = "labCashChallenge_v1";
+
+const defaultState = {
+  currentLabId: "lab1",
+  activeStudentId: null,
+  labs: [
+    {
+      id:"lab1",
+      name:"Lab 1",
+      note:"Microscope basics",
+      round:1,
+      questions:[
+        {id:"q1", text:"Can anyone remind me how to use the microscope?", value:9, used:false},
+        {id:"q2", text:"Can anyone remind me how to prepare the slide for the microscope?", value:4, used:false}
+      ]
+    }
+  ],
+  students:[]
+};
+
+let state = loadState();
+let activeQuestionId = null;
+
+function cloneState(o){ return JSON.parse(JSON.stringify(o)); }
+
+// Repairs old or broken saved data so the app never crashes on it
+function cleanState(parsed){
+  const base = cloneState(defaultState);
+  if(!parsed || typeof parsed!=="object") return base;
+  const stamp = Date.now();
+  let labs = Array.isArray(parsed.labs) ? parsed.labs.filter(l=>l && typeof l==="object").map((l,i)=>({
+    id: l.id ? String(l.id) : "lab"+stamp+"_"+i,
+    name: l.name ? String(l.name) : "Lab "+(i+1),
+    note: l.note ? String(l.note) : "",
+    round: Number(l.round)||1,
+    questions: Array.isArray(l.questions) ? l.questions.filter(q=>q && typeof q==="object").map((q,j)=>({
+      id: q.id ? String(q.id) : "q"+stamp+"_"+i+"_"+j,
+      text: String(q.text==null ? "" : q.text),
+      value: Number(q.value)||1,
+      used: !!q.used
+    })) : []
+  })) : [];
+  if(!labs.length) labs = base.labs;
+  const students = Array.isArray(parsed.students) ? parsed.students.filter(s=>s && typeof s==="object").map((s,i)=>Object.assign({}, s, {
+    id: s.id ? String(s.id) : "s"+stamp+"_"+i,
+    name: String(s.name==null ? "" : s.name),
+    studentId: String(s.studentId==null ? "" : s.studentId),
+    balance: Number(s.balance)||0,
+    history: Array.isArray(s.history) ? s.history : []
+  })) : [];
+  const currentLabId = labs.some(l=>l.id===parsed.currentLabId) ? parsed.currentLabId : labs[0].id;
+  const activeStudentId = students.some(s=>s.id===parsed.activeStudentId) ? parsed.activeStudentId : null;
+  return {currentLabId, activeStudentId, labs, students};
+}
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return cloneState(defaultState);
+    return cleanState(JSON.parse(raw));
+  }catch(e){
+    return cloneState(defaultState);
+  }
+}
+function save(){
+  let ok=true;
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e){ ok=false; }
+  const warn=document.getElementById("storageWarn");
+  if(warn) warn.style.display = ok ? "none" : "block";
+  return ok;
+}
+function currentLab(){ return state.labs.find(l=>l.id===state.currentLabId) || state.labs[0]; }
+function activeStudent(){ return state.students.find(s=>s.id===state.activeStudentId); }
+function money(n){ return "$" + Number(n||0).toFixed(0); }
+
+function render(){
+  renderLabs();
+  renderGame();
+  renderStudents();
+  renderScores();
+  renderManage();
+}
+function renderLabs(){
+  const el=document.getElementById("labList");
+  el.innerHTML="";
+  state.labs.forEach(l=>{
+    const b=document.createElement("button");
+    b.className="lab-pill"+(l.id===state.currentLabId?" active":"");
+    b.innerHTML=`<b>${escapeHtml(l.name)}</b><small>${l.questions.length} question${l.questions.length===1?"":"s"} · Round ${l.round||1}</small>`;
+    b.onclick=()=>switchLab(l.id);
+    el.appendChild(b);
+  });
+
+  const selector=document.getElementById("labSelector");
+  if(selector){
+    selector.innerHTML=state.labs.map(l=>
+      `<option value="${l.id}" ${l.id===state.currentLabId?"selected":""}>${escapeHtml(l.name)} — ${l.questions.length} question${l.questions.length===1?"":"s"}</option>`
+    ).join("");
+  }
+}
+function renderGame(){
+  const lab=currentLab();
+  if(!lab) return;
+  document.getElementById("labTitle").textContent=lab.name;
+  document.getElementById("labSub").textContent=lab.note || "Choose a student, then let them pick a mystery dollar card.";
+  document.getElementById("roundBadge").textContent=`Group Round ${lab.round||1}`;
+  document.getElementById("statQuestions").textContent=lab.questions.length;
+  document.getElementById("statRemaining").textContent=lab.questions.filter(q=>!q.used).length;
+  document.getElementById("statStudents").textContent=state.students.length;
+  const a=activeStudent();
+  const box=document.getElementById("activeStudentBox");
+  if(a){
+    box.innerHTML=`<span>Active student</span><b>${escapeHtml(a.name)}</b><span>ID: ${escapeHtml(a.studentId)} · Balance: ${money(a.balance)}</span>
+    <button class="smallbtn" style="margin-top:8px" onclick="openPickStudentModal()">Change student</button>`;
+  }else{
+    box.innerHTML=`<span>Active student</span><b>No student selected</b><span>Select a student before opening a card.</span>
+    <button class="smallbtn" style="margin-top:8px" onclick="openPickStudentModal()">Select student</button>`;
+  }
+
+  const cards=document.getElementById("cards");
+  cards.innerHTML="";
+  document.getElementById("emptyBoard").style.display=lab.questions.length?"none":"block";
+  lab.questions.forEach((q,i)=>{
+    const btn=document.createElement("button");
+    btn.className="money-card"+(q.used?" revealed":"");
+    btn.disabled=q.used;
+    btn.innerHTML=`
+      <div class="card-inner">
+        <div class="face front">
+          <div class="question-mark">?</div>
+          <div class="hint">Mystery Cash Card</div>
+        </div>
+        <div class="face back">
+          <div class="value">${money(q.value)}</div>
+          <div class="qtext">${escapeHtml(q.text)}</div>
+          <div class="used-tag">${q.used ? "Already played" : "Tap to play"}</div>
+        </div>
+      </div>`;
+    btn.onclick=()=>openQuestion(q.id);
+    cards.appendChild(btn);
+  });
+}
+function renderStudents(){
+  const tbody=document.getElementById("studentsTable");
+  tbody.innerHTML="";
+  if(!state.students.length){
+    tbody.innerHTML=`<tr><td colspan="5" style="color:#9aa7c7;text-align:center;padding:30px">No student accounts yet.</td></tr>`;
+    return;
+  }
+  state.students.forEach(s=>{
+    const tr=document.createElement("tr");
+    tr.innerHTML=`<td>${escapeHtml(s.studentId)}</td><td><b>${escapeHtml(s.name)}</b></td><td class="cash">${money(s.balance)}</td>
+      <td>${(s.history||[]).length}</td>
+      <td><button class="smallbtn" onclick="openAccount('${s.id}')">Open Account</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function renderScores(){
+  const sorted=[...state.students].sort((a,b)=>b.balance-a.balance || a.name.localeCompare(b.name));
+  document.getElementById("studentCountBadge").textContent=`${sorted.length} student${sorted.length===1?"":"s"}`;
+  const mini=document.getElementById("scoreList");
+  const big=document.getElementById("bigScoreList");
+  const rows=sorted.length ? sorted.map((s,i)=>scoreRow(s,i)).join("") :
+    `<div class="empty" style="margin-top:0;padding:24px">No scores yet.</div>`;
+  mini.innerHTML=rows;
+  big.innerHTML=rows;
+}
+function scoreRow(s,i){
+  const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":String(i+1);
+  return `<div class="score-row" onclick="openAccount('${s.id}')" style="cursor:pointer">
+    <div class="rank">${medal}</div><div><div class="student-name">${escapeHtml(s.name)}</div><div class="student-id">${escapeHtml(s.studentId)}</div></div>
+    <div class="cash">${money(s.balance)}</div></div>`;
+}
+function renderManage(){
+  const lab=currentLab(); 
+  if(!lab) return;
+
+  const labOptions=state.labs.map(l=>
+    `<option value="${l.id}" ${l.id===state.currentLabId?"selected":""}>${escapeHtml(l.name)} — ${l.questions.length} question${l.questions.length===1?"":"s"}</option>`
+  ).join("");
+  ["manageLabSelector","questionLabSelector"].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(sel){ sel.innerHTML=labOptions; sel.value=state.currentLabId; }
+  });
+
+  document.getElementById("manageCurrentLab").innerHTML=
+    `Editing: <b>${escapeHtml(lab.name)}</b>${lab.note?` · ${escapeHtml(lab.note)}`:""}`;
+
+  const count=document.getElementById("manageLabCount");
+  if(count) count.textContent=`${state.labs.length} lab${state.labs.length===1?"":"s"}`;
+
+  const labsEl=document.getElementById("manageLabsList");
+  if(labsEl){
+    labsEl.innerHTML="";
+    state.labs.forEach(l=>{
+      const row=document.createElement("div");
+      row.className="manage-lab-row"+(l.id===state.currentLabId?" current":"");
+      row.innerHTML=`
+        <div>
+          <b>${escapeHtml(l.name)}${l.id===state.currentLabId?'<span class="current-dot">● EDITING</span>':''}</b>
+          <small>${l.questions.length} question${l.questions.length===1?"":"s"} · Group Round ${l.round||1}${l.note?` · ${escapeHtml(l.note)}`:""}</small>
+        </div>
+        <div class="manage-lab-actions">
+          <button class="smallbtn" onclick="selectLabForEditing('${l.id}')">${l.id===state.currentLabId?"Editing":"Edit"}</button>
+          ${state.labs.length>1?`<button class="smallbtn" onclick="deleteLab('${l.id}')">Delete</button>`:""}
+        </div>`;
+      labsEl.appendChild(row);
+    });
+  }
+
+  const el=document.getElementById("manageQuestions");
+  el.innerHTML="";
+  if(!lab.questions.length){ 
+    el.innerHTML=`<p style="color:#9aa7c7">No questions yet in <b>${escapeHtml(lab.name)}</b>.</p>`; 
+  } else {
+    lab.questions.forEach((q,i)=>{
+      const d=document.createElement("div");
+      d.className="score-row"; 
+      d.style.gridTemplateColumns="34px 1fr auto";
+      d.innerHTML=`<div class="rank">${i+1}</div><div><div class="student-name">${escapeHtml(q.text)}</div><div class="student-id">${money(q.value)}</div></div>
+        <button class="smallbtn" onclick="removeQuestion('${q.id}')">Remove</button>`;
+      el.appendChild(d);
+    });
+  }
+}
+
+function switchLab(id){
+  if(!state.labs.some(l=>l.id===id)) return;
+  state.currentLabId=id;
+  state.activeStudentId=null;
+  save();
+  showView("game");
+  render();
+}
+
+function selectLabForEditing(id){
+  if(!state.labs.some(l=>l.id===id)) return;
+  state.currentLabId=id;
+  state.activeStudentId=null;
+  save();
+  renderLabs();
+  renderGame();
+  renderManage();
+  toast(`${currentLab().name} selected for editing.`);
+}
+function openLabFromTools(id){
+  selectLabForEditing(id);
+}
+function deleteLab(id){
+  const lab=state.labs.find(l=>l.id===id);
+  if(!lab || state.labs.length<=1) return;
+  if(!confirm(`Delete ${lab.name}?\n\nThis removes its questions from this browser. Student account history already earned will remain.`)) return;
+  state.labs=state.labs.filter(l=>l.id!==id);
+  if(state.currentLabId===id) state.currentLabId=state.labs[0].id;
+  state.activeStudentId=null;
+  save();
+  render();
+  toast(`${lab.name} deleted.`);
+}
+
+function openStudentModal(){ document.getElementById("studentModal").classList.add("show"); setTimeout(()=>studentName.focus(),100); }
+function openManageModal(){ renderManage(); document.getElementById("manageModal").classList.add("show"); }
+function closeModal(id){ document.getElementById(id).classList.remove("show"); }
+
+function createStudent(){
+  const name=document.getElementById("studentName").value.trim();
+  const sid=document.getElementById("studentId").value.trim();
+  if(!name || !sid){ toast("Please enter both student name and ID."); return; }
+  if(state.students.some(s=>s.studentId.toLowerCase()===sid.toLowerCase())){ toast("This student ID already has an account."); return; }
+  const s={id:"s"+Date.now(),name,studentId:sid,balance:0,history:[]};
+  state.students.push(s); state.activeStudentId=s.id; save();
+  document.getElementById("studentName").value="";
+  document.getElementById("studentId").value="";
+  closeModal("studentModal"); render(); toast(`${name}'s account is ready.`);
+}
+function openPickStudentModal(){
+  if(!state.students.length){ openStudentModal(); toast("Create a student account first."); return; }
+  const sel=document.getElementById("pickStudentSelect");
+  sel.innerHTML=state.students.map(s=>`<option value="${s.id}" ${s.id===state.activeStudentId?"selected":""}>${escapeHtml(s.name)} — ${escapeHtml(s.studentId)}</option>`).join("");
+  document.getElementById("pickStudentModal").classList.add("show");
+}
+function confirmStudentSelection(){
+  state.activeStudentId=document.getElementById("pickStudentSelect").value;
+  save(); closeModal("pickStudentModal"); render();
+}
+function openQuestion(qid){
+  const student=activeStudent();
+  if(!student){ openPickStudentModal(); return; }
+  const lab=currentLab();
+  const q=lab.questions.find(x=>x.id===qid);
+  if(!q || q.used) return;
+  activeQuestionId=qid;
+  document.getElementById("questionLabBadge").textContent=lab.name.toUpperCase();
+  document.getElementById("questionValue").textContent=money(q.value);
+  document.getElementById("questionText").textContent=q.text;
+  document.getElementById("questionStudent").innerHTML=`<span>Playing now</span><b>${escapeHtml(student.name)}</b><span>ID: ${escapeHtml(student.studentId)} · Current balance: ${money(student.balance)}</span>`;
+  document.getElementById("questionModal").classList.add("show");
+}
+function gradeAnswer(correct){
+  const lab=currentLab();
+  const q=lab.questions.find(x=>x.id===activeQuestionId);
+  const s=activeStudent();
+  if(!q || !s) return;
+  q.used=true;
+  const txn={
+    id:"t"+Date.now(),
+    labId:lab.id,
+    labName:lab.name,
+    round:lab.round||1,
+    question:q.text,
+    value:q.value,
+    correct:!!correct,
+    timestamp:new Date().toISOString()
+  };
+  s.history=s.history||[];
+  s.history.unshift(txn);
+  if(correct) s.balance=Number(s.balance||0)+Number(q.value||0);
+  save();
+  closeModal("questionModal");
+  activeQuestionId=null;
+  render();
+  if(correct){ successSound(); celebrate(q.value); }
+  else { failSound(); toast(`Incorrect — no deposit. ${s.name} remains at ${money(s.balance)}.`); }
+}
+function restartBoard(){
+  const lab=currentLab();
+  if(!lab) return;
+  if(!confirm(`Restart ${lab.name} for a new student group?\n\nThis will make all question cards available again. Student balances and account histories will stay unchanged.`)) return;
+  lab.questions.forEach(q=>q.used=false);
+  lab.round=(lab.round||1)+1;
+  state.activeStudentId=null;
+  save(); render(); toast(`${lab.name} restarted for Group Round ${lab.round}.`);
+}
+function createLab(){
+  const name=document.getElementById("newLabName").value.trim();
+  const note=document.getElementById("newLabNote").value.trim();
+  if(!name){ toast("Enter a lab name."); return; }
+
+  const id="lab"+Date.now();
+  state.labs.push({id,name,note,round:1,questions:[]});
+  state.currentLabId=id;
+  state.activeStudentId=null;
+
+  document.getElementById("newLabName").value="";
+  document.getElementById("newLabNote").value="";
+
+  save();
+  renderLabs();
+  renderGame();
+  renderManage();
+
+  toast(`${name} created. It is now selected for editing.`);
+}
+function addQuestion(){
+  const lab=currentLab();
+  if(!lab){ toast("Choose a lab first."); return; }
+
+  const text=document.getElementById("newQuestionText").value.trim();
+  const value=Number(document.getElementById("newQuestionValue").value);
+
+  if(!text || !value || value<1){
+    toast("Enter a question and a positive dollar value.");
+    return;
+  }
+
+  lab.questions.push({
+    id:"q"+Date.now(),
+    text,
+    value:Math.round(value),
+    used:false
+  });
+
+  document.getElementById("newQuestionText").value="";
+  document.getElementById("newQuestionValue").value="";
+
+  save();
+  renderLabs();
+  renderGame();
+  renderManage();
+
+  toast(`Question added to ${lab.name}.`);
+}
+function removeQuestion(qid){
+  const lab=currentLab();
+  const q=lab.questions.find(x=>x.id===qid);
+  if(!q) return;
+  if(!confirm(`Remove this question?\n\n"${q.text}"`)) return;
+  lab.questions=lab.questions.filter(x=>x.id!==qid);
+  save();
+  renderLabs();
+  renderGame();
+  renderManage();
+}
+function openAccount(id){
+  const s=state.students.find(x=>x.id===id); if(!s)return;
+  document.getElementById("accountTitle").textContent=s.name;
+  document.getElementById("accountMeta").textContent=`Student ID: ${s.studentId}`;
+  document.getElementById("accountBalance").textContent=money(s.balance);
+  const hist=s.history||[];
+  const correct=hist.filter(x=>x.correct).length;
+  document.getElementById("accountStats").innerHTML=`<span class="badge">${correct} correct / ${hist.length} played</span>`;
+  const el=document.getElementById("accountHistory");
+  if(!hist.length){ el.innerHTML=`<div class="empty" style="padding:25px">No game history yet.</div>`; }
+  else{
+    el.innerHTML=hist.map(h=>`<div class="score-row" style="grid-template-columns:34px 1fr auto;margin-bottom:8px">
+      <div class="rank">${h.correct?"✓":"✕"}</div>
+      <div><div class="student-name">${escapeHtml(h.labName)} · Round ${h.round}</div><div class="student-id">${escapeHtml(h.question)}</div></div>
+      <div class="${h.correct?"cash":""}">${h.correct?"+":""}${money(h.correct?h.value:0)}</div>
+    </div>`).join("");
+  }
+  document.getElementById("accountModal").classList.add("show");
+}
+function showView(v){
+  ["game","students","scores"].forEach(x=>{
+    document.getElementById(x+"View").style.display=x===v?"block":"none";
+    document.getElementById("nav"+x[0].toUpperCase()+x.slice(1)).classList.toggle("active",x===v);
+  });
+}
+function toggleFullscreen(){
+  if(!document.fullscreenElement) document.documentElement.requestFullscreen?.();
+  else document.exitFullscreen?.();
+}
+function celebrate(value){
+  const wrap=document.getElementById("celebration");
+  document.getElementById("celebrateCash").textContent=`+${money(value)} deposited`;
+  wrap.classList.add("show");
+  const colors=["#ffcf5a","#38d98a","#6da8ff","#ff6b9d","#ffffff"];
+  for(let i=0;i<85;i++){
+    const c=document.createElement("div"); c.className="confetti";
+    c.style.left=Math.random()*100+"vw";
+    c.style.background=colors[Math.floor(Math.random()*colors.length)];
+    c.style.animationDelay=(Math.random()*.45)+"s";
+    c.style.transform=`rotate(${Math.random()*360}deg)`;
+    wrap.appendChild(c);
+    setTimeout(()=>c.remove(),2800);
+  }
+  setTimeout(()=>wrap.classList.remove("show"),2200);
+}
+function audioCtx(){
+  const A=window.AudioContext||window.webkitAudioContext;
+  return A ? new A() : null;
+}
+function successSound(){
+  const ctx=audioCtx(); if(!ctx)return;
+  const notes=[523.25,659.25,783.99,1046.5];
+  notes.forEach((f,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.connect(g);g.connect(ctx.destination);o.frequency.value=f;o.type="sine";
+    const t=ctx.currentTime+i*.11;g.gain.setValueAtTime(.001,t);g.gain.exponentialRampToValueAtTime(.18,t+.02);g.gain.exponentialRampToValueAtTime(.001,t+.22);
+    o.start(t);o.stop(t+.25);
+  });
+}
+function failSound(){
+  const ctx=audioCtx(); if(!ctx)return;
+  [220,165].forEach((f,i)=>{
+    const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=f;o.type="sawtooth";
+    const t=ctx.currentTime+i*.18;g.gain.setValueAtTime(.11,t);g.gain.exponentialRampToValueAtTime(.001,t+.2);o.start(t);o.stop(t+.21);
+  });
+}
+function toast(msg){
+  const t=document.getElementById("toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>t.classList.remove("show"),2800);
+}
+function escapeHtml(s){
+  return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+}
+document.querySelectorAll(".modal-backdrop").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
+render();
+</script>
+</body>
+</html>
