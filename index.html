@@ -245,6 +245,22 @@
     .top-actions .btn.primary{display:inline-flex}
     .restart-inline{display:inline-flex;width:100%;justify-content:center;margin-top:14px}
   }
+
+  /* ---- cloud sync ---- */
+  .cloud-pill{display:none;align-items:center;padding:8px 12px;border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.04);font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap}
+  .cloud-pill.synced{color:#7ef0b0;border-color:rgba(126,240,176,.35)}
+  .cloud-pill.saving,.cloud-pill.connecting{color:#ffe79d;border-color:rgba(255,231,157,.35)}
+  .cloud-pill.offline,.cloud-pill.error{color:#ff9b9b;border-color:rgba(255,155,155,.4)}
+  #cloudBanner{display:none;margin-bottom:10px;padding:12px 14px;border-radius:14px;border:1px solid #7a2e2e;background:#3a1717;color:#ffc9c9;font-weight:700;font-size:13px}
+  .login-overlay{position:fixed;inset:0;z-index:300;display:none;align-items:center;justify-content:center;padding:18px;background:radial-gradient(circle at 15% 0%, rgba(109,168,255,.14), transparent 28%),var(--bg)}
+  body.cloud-locked .login-overlay{display:flex}
+  .login-card{width:min(420px,100%);background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow)}
+  .login-card h2{margin:14px 0 6px;font-size:22px}
+  .login-card p{margin:0 0 16px;color:var(--muted);font-size:14px;line-height:1.45}
+  .login-card .field{margin-bottom:12px}
+  #loginError{display:none;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#3a1717;border:1px solid #7a2e2e;color:#ffc9c9;font-size:13px;font-weight:700}
+  #loginBtn{width:100%;justify-content:center}
+  #loginPin{text-align:center;font-size:22px;letter-spacing:.35em}
 </style>
 </head>
 <body>
@@ -252,12 +268,14 @@
   <div id="storageWarn" style="display:none;margin-bottom:10px;padding:12px 14px;border-radius:14px;border:1px solid #6a5517;background:#3a2e10;color:#ffe79d;font-weight:700;font-size:13px">
     ⚠ This browser is blocking saving. Your labs and questions work now, but they will disappear when you close this page. Open this file in Chrome to keep them.
   </div>
+  <div id="cloudBanner"></div>
   <header class="topbar">
     <div class="brand">
       <div class="logo">$</div>
       <div><h1>Lab Cash Challenge</h1><p>Answer correctly. Build your lab bank.</p></div>
     </div>
     <div class="top-actions">
+      <span id="cloudPill" class="cloud-pill"></span>
       <button class="btn" onclick="openStudentModal()">+ Student</button>
       <button class="btn gold" onclick="restartBoard()">Restart for New Group</button>
       <button class="btn primary" onclick="openManageModal()">Instructor Tools</button>
@@ -391,6 +409,12 @@
     <h3>Instructor Tools</h3>
     <p>Select the lab you want to edit, then add or remove questions for that lab.</p>
 
+    <div class="manage-card" id="cloudCard" style="display:none">
+      <h4>Cloud sync</h4>
+      <p>This phone is unlocked. Labs, questions and student accounts are shared with every instructor.</p>
+      <div class="modal-actions" style="margin-top:10px"><button class="btn" onclick="cloudSignOut()">Lock this phone</button></div>
+    </div>
+
     <div class="manage-card">
       <h4>Edit a lab</h4>
       <p>Choose exactly which lab you want to manage.</p>
@@ -462,6 +486,20 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-card">
+    <div class="logo">$</div>
+    <div id="loginLoading"><h2>Lab Cash Challenge</h2><p id="loginLoadingText">Connecting…</p></div>
+    <div id="loginForm" style="display:none">
+      <h2>Instructor PIN</h2>
+      <p>Enter the PIN to load your labs and student accounts on this phone.</p>
+      <div class="field"><label for="loginPin">PIN</label><input id="loginPin" type="password" inputmode="numeric" autocomplete="off" placeholder="••••••"></div>
+      <div id="loginError"></div>
+      <button class="btn primary" id="loginBtn" onclick="cloudSignIn()">Unlock</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const STORAGE_KEY = "labCashChallenge_v1";
 
@@ -488,14 +526,12 @@ let activeQuestionId = null;
 
 function cloneState(o){ return JSON.parse(JSON.stringify(o)); }
 
-// Repairs old or broken saved data so the app never crashes on it
-function cleanState(parsed){
-  const base = cloneState(defaultState);
-  if(!parsed || typeof parsed!=="object") return base;
-  const stamp = Date.now();
-  let labs = Array.isArray(parsed.labs) ? parsed.labs.filter(l=>l && typeof l==="object").map((l,i)=>({
+function cleanLab(l,i){
+  const stamp=Date.now();
+  l=(l && typeof l==="object") ? l : {};
+  const out={
     id: l.id ? String(l.id) : "lab"+stamp+"_"+i,
-    name: l.name ? String(l.name) : "Lab "+(i+1),
+    name: l.name ? String(l.name) : "Lab "+((i||0)+1),
     note: l.note ? String(l.note) : "",
     round: Number(l.round)||1,
     questions: Array.isArray(l.questions) ? l.questions.filter(q=>q && typeof q==="object").map((q,j)=>({
@@ -504,15 +540,28 @@ function cleanState(parsed){
       value: Number(q.value)||1,
       used: !!q.used
     })) : []
-  })) : [];
-  if(!labs.length) labs = base.labs;
-  const students = Array.isArray(parsed.students) ? parsed.students.filter(s=>s && typeof s==="object").map((s,i)=>Object.assign({}, s, {
+  };
+  if(typeof l._ord==="number") out._ord=l._ord;
+  return out;
+}
+function cleanStudent(s,i){
+  const stamp=Date.now();
+  s=(s && typeof s==="object") ? s : {};
+  return Object.assign({}, s, {
     id: s.id ? String(s.id) : "s"+stamp+"_"+i,
     name: String(s.name==null ? "" : s.name),
     studentId: String(s.studentId==null ? "" : s.studentId),
     balance: Number(s.balance)||0,
     history: Array.isArray(s.history) ? s.history : []
-  })) : [];
+  });
+}
+// Repairs old or broken saved data so the app never crashes on it
+function cleanState(parsed){
+  const base = cloneState(defaultState);
+  if(!parsed || typeof parsed!=="object") return base;
+  let labs = Array.isArray(parsed.labs) ? parsed.labs.filter(l=>l && typeof l==="object").map(cleanLab) : [];
+  if(!labs.length) labs = base.labs;
+  const students = Array.isArray(parsed.students) ? parsed.students.filter(s=>s && typeof s==="object").map(cleanStudent) : [];
   const currentLabId = labs.some(l=>l.id===parsed.currentLabId) ? parsed.currentLabId : labs[0].id;
   const activeStudentId = students.some(s=>s.id===parsed.activeStudentId) ? parsed.activeStudentId : null;
   return {currentLabId, activeStudentId, labs, students};
@@ -527,12 +576,17 @@ function loadState(){
     return cloneState(defaultState);
   }
 }
-function save(){
+function saveLocal(){
   let ok=true;
   try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
   catch(e){ ok=false; }
   const warn=document.getElementById("storageWarn");
-  if(warn) warn.style.display = ok ? "none" : "block";
+  if(warn) warn.style.display = (ok || CLOUD.enabled) ? "none" : "block";
+  return ok;
+}
+function save(){
+  const ok=saveLocal();
+  try{ cloudPush(); }catch(e){ console.error(e); }
   return ok;
 }
 function currentLab(){ return state.labs.find(l=>l.id===state.currentLabId) || state.labs[0]; }
@@ -931,7 +985,257 @@ function escapeHtml(s){
   return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
 }
 document.querySelectorAll(".modal-backdrop").forEach(m=>m.addEventListener("click",e=>{if(e.target===m)m.classList.remove("show")}));
+
+/* =====================================================================
+   CLOUD SYNC (Firebase) — shares labs, questions and student accounts
+   between instructors. Leave the PASTE_ values as they are to run the
+   game on this phone only (no sync).
+   ===================================================================== */
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDCo7K7jnXaAGfG85EZhH3UdSe8W5tkv0I",
+  authDomain: "lab-cash-challenge.firebaseapp.com",
+  projectId: "lab-cash-challenge",
+  storageBucket: "lab-cash-challenge.firebasestorage.app",
+  messagingSenderId: "165043679115",
+  appId: "1:165043679115:web:a75114d3ee4edf5517898e"
+};
+// The one shared instructor account. Create it in Firebase with this email
+// and the instructor PIN as its password. It can be any made-up email.
+const INSTRUCTOR_EMAIL = "instructor@labcash.app";
+const FB_BASE = "https://www.gstatic.com/firebasejs/12.16.0/";
+const COLL = {labs:"lcc_labs", students:"lcc_students"};
+const CLOUD = {
+  enabled:false, failed:false, ready:false, user:null,
+  auth:null, authM:null, db:null, fs:null,
+  unsubs:[], remote:{labs:null,students:null}, sig:{labs:"",students:""},
+  sent:{labs:{},students:{}}, pending:{labs:false,students:false}
+};
+
+function cloudConfigured(){
+  const c=FIREBASE_CONFIG;
+  return !!(c.apiKey && c.projectId && !/^PASTE/i.test(c.apiKey) && !/^PASTE/i.test(c.projectId));
+}
+
+// Same text for the same data, whatever the key order
+function canon(v){
+  if(Array.isArray(v)) return "["+v.map(canon).join(",")+"]";
+  if(v && typeof v==="object"){
+    return "{"+Object.keys(v).sort().filter(k=>v[k]!==undefined).map(k=>JSON.stringify(k)+":"+canon(v[k])).join(",")+"}";
+  }
+  return JSON.stringify(v);
+}
+function plain(o){ return JSON.parse(JSON.stringify(o)); }
+function mapSig(arr){ const m={}; arr.forEach(e=>{ m[e.id]=canon(plain(e)); }); return canon(m); }
+function byOrd(a,b){
+  const x=typeof a._ord==="number"?a._ord:Infinity, y=typeof b._ord==="number"?b._ord:Infinity;
+  if(x!==y) return x<y?-1:1;
+  return String(a.id)<String(b.id)?-1:1;
+}
+function fixSelection(){
+  if(!state.labs.some(l=>l.id===state.currentLabId)) state.currentLabId=state.labs[0].id;
+  if(state.activeStudentId && !state.students.some(s=>s.id===state.activeStudentId)) state.activeStudentId=null;
+}
+
+/* ---------- screen messages ---------- */
+function updateCloudStatus(){
+  const el=document.getElementById("cloudPill"); if(!el) return;
+  let s="off", text="";
+  if(CLOUD.enabled){
+    if(CLOUD.failed){ s="error"; text="☁ Not connected"; }
+    else if(!CLOUD.ready){ s="connecting"; text="☁ Connecting…"; }
+    else if(!navigator.onLine){ s="offline"; text="☁ Offline — will sync later"; }
+    else if(CLOUD.pending.labs||CLOUD.pending.students){ s="saving"; text="☁ Saving…"; }
+    else { s="synced"; text="☁ Synced"; }
+  }
+  el.className="cloud-pill"+(s==="off"?"":" "+s);
+  el.style.display = s==="off" ? "none" : "inline-flex";
+  el.textContent=text;
+  const card=document.getElementById("cloudCard");
+  if(card){
+    card.style.display = (CLOUD.enabled && CLOUD.user) ? "block" : "none";
+  }
+}
+function showBanner(msg){
+  const b=document.getElementById("cloudBanner"); if(!b) return;
+  b.textContent=msg||""; b.style.display=msg?"block":"none";
+}
+function showLock(mode,msg){
+  document.body.classList.add("cloud-locked");
+  document.getElementById("loginLoading").style.display = mode==="loading" ? "block" : "none";
+  document.getElementById("loginForm").style.display = mode==="form" ? "block" : "none";
+  if(mode==="loading") document.getElementById("loginLoadingText").textContent=msg||"Loading…";
+}
+function hideLock(){ document.body.classList.remove("cloud-locked"); }
+function setLoginError(msg){ const e=document.getElementById("loginError"); e.textContent=msg||""; e.style.display=msg?"block":"none"; }
+
+/* ---------- sign in / out ---------- */
+function friendlyAuthError(e){
+  const c=(e&&e.code)||"";
+  if(["auth/invalid-credential","auth/wrong-password","auth/user-not-found","auth/invalid-email"].includes(c)) return "Wrong PIN.";
+  if(c==="auth/too-many-requests") return "Too many tries. Wait a few minutes, then try again.";
+  if(c==="auth/network-request-failed") return "No internet connection.";
+  if(c==="auth/operation-not-allowed") return "Email and password sign-in is not turned on in Firebase.";
+  return "Could not unlock"+(c?" ("+c+")":"")+".";
+}
+async function cloudSignIn(){
+  if(!CLOUD.authM){ setLoginError("Still connecting. Wait a moment and try again."); return; }
+  const pin=document.getElementById("loginPin").value.trim();
+  if(!pin){ setLoginError("Enter the PIN."); return; }
+  if(pin.length<6){ setLoginError("The PIN has at least 6 digits."); return; }
+  const btn=document.getElementById("loginBtn");
+  btn.disabled=true; setLoginError("");
+  try{ await CLOUD.authM.signInWithEmailAndPassword(CLOUD.auth,INSTRUCTOR_EMAIL,pin); }
+  catch(e){ setLoginError(friendlyAuthError(e)); }
+  btn.disabled=false;
+}
+async function cloudSignOut(){
+  if(!CLOUD.authM) return;
+  if(!confirm("Lock this phone? You will need the PIN to open the game again.")) return;
+  closeModal("manageModal");
+  try{ await CLOUD.authM.signOut(CLOUD.auth); }catch(e){ console.error(e); }
+}
+
+/* ---------- listening to the cloud ---------- */
+function stopListening(){
+  CLOUD.unsubs.forEach(u=>{ try{u();}catch(e){} });
+  CLOUD.unsubs=[]; CLOUD.ready=false;
+  CLOUD.remote={labs:null,students:null}; CLOUD.sig={labs:"",students:""};
+  CLOUD.sent={labs:{},students:{}}; CLOUD.pending={labs:false,students:false};
+}
+function startListening(){
+  stopListening();
+  ["labs","students"].forEach(kind=>{
+    const u=CLOUD.fs.onSnapshot(
+      CLOUD.fs.collection(CLOUD.db,COLL[kind]),
+      {includeMetadataChanges:true},
+      snap=>onRemote(kind,snap),
+      err=>onCloudError(err)
+    );
+    CLOUD.unsubs.push(u);
+  });
+}
+function onRemote(kind,snap){
+  CLOUD.pending[kind]=!!(snap.metadata && snap.metadata.hasPendingWrites);
+  const arr=[], sent={};
+  snap.forEach(d=>{ const data=d.data(); data.id=d.id; arr.push(data); sent[d.id]=canon(data); });
+  const sig=canon(sent);
+  const changed = sig!==CLOUD.sig[kind];
+  CLOUD.sig[kind]=sig;
+  CLOUD.remote[kind]=arr;
+  if(!CLOUD.ready){
+    if(CLOUD.remote.labs!==null && CLOUD.remote.students!==null) cloudFirstReconcile();
+  }else if(changed){
+    CLOUD.sent[kind]=sent;
+    applyRemote(kind);
+  }
+  updateCloudStatus();
+}
+function applyRemote(kind){
+  const incoming=CLOUD.remote[kind].map(kind==="labs"?cleanLab:cleanStudent).sort(byOrd);
+  if(kind==="labs" && !incoming.length) return;           // never leave the game without a lab
+  if(mapSig(incoming)===mapSig(state[kind])) return;      // nothing new (it was our own change)
+  state[kind]=incoming;
+  fixSelection(); saveLocal(); render();
+  cloudPush();                                            // repairs anything the cleaning changed
+}
+// The first time this phone connects
+function cloudFirstReconcile(){
+  const key="lcc_linked_"+FIREBASE_CONFIG.projectId;
+  let linked=false;
+  try{ linked = localStorage.getItem(key)==="1"; }catch(e){ linked=true; }   // cannot remember -> cloud wins
+  ["labs","students"].forEach(kind=>{
+    const clean=kind==="labs"?cleanLab:cleanStudent;
+    const remoteArr=CLOUD.remote[kind].map(clean);
+    const ids=new Set(remoteArr.map(e=>e.id));
+    let merged=remoteArr.slice();
+    // First connection ever: keep what is already on this phone and upload it
+    if(!linked) state[kind].forEach(e=>{ if(!ids.has(e.id)) merged.push(e); });
+    if(kind==="labs" && !merged.length) merged=state.labs.slice();
+    state[kind]=merged.sort(byOrd);
+    CLOUD.sent[kind]={};
+    CLOUD.remote[kind].forEach(d=>{ CLOUD.sent[kind][d.id]=canon(d); });
+  });
+  try{ localStorage.setItem(key,"1"); }catch(e){}
+  CLOUD.ready=true;
+  fixSelection(); saveLocal(); hideLock(); render(); cloudPush();
+}
+
+/* ---------- sending changes to the cloud ---------- */
+function cloudPush(){
+  if(!CLOUD.ready) return;
+  ["labs","students"].forEach(kind=>{
+    const seen={};
+    state[kind].forEach((e,i)=>{
+      if(typeof e._ord!=="number") e._ord=Date.now()+i;
+      const data=plain(e), c=canon(data);
+      seen[e.id]=true;
+      if(CLOUD.sent[kind][e.id]!==c){
+        CLOUD.sent[kind][e.id]=c;
+        CLOUD.fs.setDoc(CLOUD.fs.doc(CLOUD.db,COLL[kind],String(e.id)),data).catch(onCloudError);
+      }
+    });
+    Object.keys(CLOUD.sent[kind]).forEach(id=>{
+      if(!seen[id]){
+        delete CLOUD.sent[kind][id];
+        CLOUD.fs.deleteDoc(CLOUD.fs.doc(CLOUD.db,COLL[kind],String(id))).catch(onCloudError);
+      }
+    });
+  });
+}
+function onCloudError(err){
+  console.error("Cloud error:",err);
+  const c=(err&&err.code)||"";
+  if(c.includes("permission-denied")) showBanner("The cloud refused this action. Check that your account was added and that the Firestore rules were published.");
+  else if(c.includes("unavailable")||c.includes("network")) showBanner("");
+  else showBanner("Cloud problem"+(c?" ("+c+")":"")+". Changes may not be shared.");
+}
+
+/* ---------- start ---------- */
+function onAuthChange(user){
+  CLOUD.user=user||null;
+  setLoginError("");
+  document.getElementById("loginPin").value="";
+  if(user){
+    showLock("loading","Loading your labs…");
+    clearTimeout(window.__lockTimer);
+    window.__lockTimer=setTimeout(()=>{ if(!CLOUD.ready) document.getElementById("loginLoadingText").textContent="Taking long. Check your internet connection."; },9000);
+    startListening();
+  }else{
+    stopListening();
+    showLock("form");
+  }
+  updateCloudStatus();
+}
+async function cloudInit(){
+  if(!cloudConfigured()) return;
+  CLOUD.enabled=true;
+  showLock("loading","Connecting…");
+  updateCloudStatus();
+  window.addEventListener("online",updateCloudStatus);
+  window.addEventListener("offline",updateCloudStatus);
+  document.getElementById("loginPin").addEventListener("keydown",e=>{ if(e.key==="Enter") cloudSignIn(); });
+  try{
+    const [appM,authM,fsM]=await Promise.all([
+      import(FB_BASE+"firebase-app.js"),
+      import(FB_BASE+"firebase-auth.js"),
+      import(FB_BASE+"firebase-firestore.js")
+    ]);
+    const app=appM.initializeApp(FIREBASE_CONFIG);
+    CLOUD.authM=authM; CLOUD.fs=fsM; CLOUD.auth=authM.getAuth(app);
+    try{
+      CLOUD.db=fsM.initializeFirestore(app,{localCache:fsM.persistentLocalCache({tabManager:fsM.persistentMultipleTabManager()})});
+    }catch(e){ CLOUD.db=fsM.getFirestore(app); }
+    authM.onAuthStateChanged(CLOUD.auth,onAuthChange,onCloudError);
+  }catch(e){
+    console.error(e);
+    CLOUD.failed=true; hideLock(); updateCloudStatus();
+    showBanner("Cannot reach the cloud. The game works on this phone only, and your changes will NOT be shared. Connect to the internet and reload the page.");
+  }
+}
+
+if(cloudConfigured()) document.body.classList.add("cloud-locked");
 render();
+cloudInit();
 </script>
 </body>
 </html>
