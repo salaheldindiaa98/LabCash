@@ -261,6 +261,13 @@
   #loginError{display:none;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#3a1717;border:1px solid #7a2e2e;color:#ffc9c9;font-size:13px;font-weight:700}
   #loginBtn{width:100%;justify-content:center}
   #loginPin{text-align:center;font-size:22px;letter-spacing:.35em}
+  /* ---- question pictures ---- */
+  .q-img{display:block;max-width:100%;max-height:42vh;margin:14px auto 0;border-radius:14px;border:1px solid var(--line);background:#fff;object-fit:contain;cursor:zoom-in}
+  .q-img-loading{margin-top:14px;padding:18px;border-radius:14px;border:1px dashed var(--line);color:var(--muted);text-align:center;font-size:13px}
+  .q-thumb{display:block;max-width:150px;max-height:110px;margin-top:8px;border-radius:10px;border:1px solid var(--line);background:#fff;object-fit:contain;cursor:zoom-in}
+  .lightbox{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.93);padding:10px;cursor:zoom-out}
+  .lightbox.show{display:flex}
+  .lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;background:#fff}
 </style>
 </head>
 <body>
@@ -396,6 +403,7 @@
     </div>
     <h3 style="margin-top:18px">Question</h3>
     <p id="questionText" style="font-size:20px;color:white;line-height:1.45;font-weight:800"></p>
+    <div id="questionImageWrap"></div>
     <div class="active-student" id="questionStudent"></div>
     <div class="answer-actions">
       <button class="answer-btn wrong" onclick="gradeAnswer(false)">✕ False / Incorrect</button>
@@ -453,6 +461,7 @@
       <p id="manageCurrentLab" style="margin-top:10px"></p>
       <div class="field" style="margin-top:12px"><label>Question</label><textarea id="newQuestionText" placeholder="Type the question"></textarea></div>
       <div class="field" style="margin-top:10px"><label>Dollar value</label><input id="newQuestionValue" type="number" min="1" step="1" placeholder="e.g. 5"></div>
+      <div class="field" style="margin-top:10px"><label for="newQuestionImage">Picture (optional)</label><input id="newQuestionImage" type="file" accept="image/*" onchange="pickNewQuestionImage(this)"><div id="newQuestionImagePreview"></div></div>
       <div class="modal-actions"><button class="btn primary" onclick="addQuestion()">+ Add Question</button></div>
     </div>
 
@@ -498,6 +507,9 @@
   <div class="celebrate-center">🎉 CORRECT! 🎉<div id="celebrateCash" style="font-size:.38em;color:#86f3bb;margin-top:8px"></div></div>
 </div>
 <div class="toast" id="toast"></div>
+
+<input type="file" id="qImagePicker" accept="image/*" style="display:none" onchange="onQuestionImagePicked(this)">
+<div class="lightbox" id="lightbox" onclick="closeLightbox()"><img id="lightboxImg" alt="Question picture"></div>
 
 <div class="login-overlay" id="loginOverlay">
   <div class="login-card">
@@ -552,7 +564,8 @@ function cleanLab(l,i){
       id: q.id ? String(q.id) : "q"+stamp+"_"+i+"_"+j,
       text: String(q.text==null ? "" : q.text),
       value: Number(q.value)||1,
-      used: !!q.used
+      used: !!q.used,
+      ...(typeof q.imageId==="string" && q.imageId ? {imageId:q.imageId} : {})
     })) : []
   };
   if(typeof l._ord==="number") out._ord=l._ord;
@@ -750,9 +763,14 @@ function renderManage(){
     lab.questions.forEach((q,i)=>{
       const d=document.createElement("div");
       d.className="score-row"; 
-      d.style.gridTemplateColumns="34px 1fr auto";
-      d.innerHTML=`<div class="rank">${i+1}</div><div><div class="student-name">${escapeHtml(q.text)}</div><div class="student-id">${money(q.value)}</div></div>
-        <button class="smallbtn" onclick="removeQuestion('${q.id}')">Remove</button>`;
+      d.style.gridTemplateColumns="34px 1fr";
+      d.innerHTML=`<div class="rank">${i+1}</div><div><div class="student-name">${escapeHtml(q.text)}</div><div class="student-id">${money(q.value)}</div>
+        ${thumbHtml(q)}
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">
+          <button class="smallbtn" onclick="pickImageFor('${q.id}')">📷 ${q.imageId?"Change picture":"Add picture"}</button>
+          ${q.imageId?`<button class="smallbtn" onclick="removeQuestionImage('${q.id}')">Remove picture</button>`:""}
+          <button class="smallbtn" onclick="removeQuestion('${q.id}')">Remove question</button>
+        </div></div>`;
       el.appendChild(d);
     });
   }
@@ -784,6 +802,7 @@ function deleteLab(id){
   const lab=state.labs.find(l=>l.id===id);
   if(!lab || state.labs.length<=1) return;
   if(!confirm(`Delete ${lab.name}?\n\nThis removes the lab and its questions for every instructor. Student account history already earned will remain.`)) return;
+  lab.questions.forEach(q=>{ if(q.imageId) imgDelete(q.imageId); });
   state.labs=state.labs.filter(l=>l.id!==id);
   if(state.currentLabId===id) state.currentLabId=state.labs[0].id;
   state.activeStudentId=null;
@@ -827,6 +846,7 @@ function openQuestion(qid){
   document.getElementById("questionLabBadge").textContent=lab.name.toUpperCase();
   document.getElementById("questionValue").textContent=money(q.value);
   document.getElementById("questionText").textContent=q.text;
+  updateQuestionImage();
   document.getElementById("questionStudent").innerHTML=`<span>Playing now</span><b>${escapeHtml(student.name)}</b><span>ID: ${escapeHtml(student.studentId)} · Current balance: ${money(student.balance)}</span>`;
   document.getElementById("questionModal").classList.add("show");
 }
@@ -897,12 +917,18 @@ function addQuestion(){
     return;
   }
 
-  lab.questions.push({
+  const newQ={
     id:"q"+Date.now(),
     text,
     value:Math.round(value),
     used:false
-  });
+  };
+  if(pendingNewImage){
+    newQ.imageId="img"+Date.now()+Math.random().toString(36).slice(2,6);
+    imgPut(newQ.imageId,pendingNewImage);
+    pendingNewImage=null; renderNewImagePreview();
+  }
+  lab.questions.push(newQ);
 
   document.getElementById("newQuestionText").value="";
   document.getElementById("newQuestionValue").value="";
@@ -919,6 +945,7 @@ function removeQuestion(qid){
   const q=lab.questions.find(x=>x.id===qid);
   if(!q) return;
   if(!confirm(`Remove this question?\n\n"${q.text}"`)) return;
+  if(q.imageId) imgDelete(q.imageId);
   lab.questions=lab.questions.filter(x=>x.id!==qid);
   save();
   renderLabs();
@@ -1161,7 +1188,7 @@ async function cloudSignOut(){
 /* ---------- listening to the cloud ---------- */
 function stopListening(){
   CLOUD.unsubs.forEach(u=>{ try{u();}catch(e){} });
-  CLOUD.unsubs=[]; CLOUD.ready=false;
+  CLOUD.unsubs=[]; CLOUD.ready=false; imgClearAll();
   CLOUD.remote={labs:null,students:null}; CLOUD.sig={labs:"",students:""};
   CLOUD.sent={labs:{},students:{}}; CLOUD.pending={labs:false,students:false};
 }
@@ -1176,6 +1203,7 @@ function startListening(){
     );
     CLOUD.unsubs.push(u);
   });
+  CLOUD.unsubs.push(CLOUD.fs.onSnapshot(CLOUD.fs.collection(CLOUD.db,IMG_COLL), onRemoteImages, err=>onCloudError(err)));
 }
 function onRemote(kind,snap){
   CLOUD.pending[kind]=!!(snap.metadata && snap.metadata.hasPendingWrites);
@@ -1296,6 +1324,178 @@ async function cloudInit(){
   }
 }
 
+
+/* =====================================================================
+   QUESTION PICTURES
+   Pictures are shrunk on the phone, then saved in their own cloud
+   collection (lcc_images), one document per picture. They are NOT stored
+   inside the lab, so labs stay small and fast.
+   ===================================================================== */
+const IMAGES = {};
+const IMG_LOCAL_KEY = "labCashChallenge_images_v1";
+const IMG_COLL = "lcc_images";
+const IMG_MAX_CHARS = 380000;                 // keeps each picture far below Firestore's 1 MB limit
+const IMG_OK = /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+\/=]+$/;
+let pendingNewImage = null;                   // picture chosen in the Add question box
+let imageTarget = null;                       // {labId, qid} while changing a picture of an existing question
+let imagesSig = "";
+
+function imgUsesCloud(){ return CLOUD.enabled && !CLOUD.failed && CLOUD.ready; }
+function loadLocalImages(){
+  try{
+    const o=JSON.parse(localStorage.getItem(IMG_LOCAL_KEY)||"{}");
+    Object.keys(o).forEach(k=>{ if(typeof o[k]==="string" && IMG_OK.test(o[k])) IMAGES[k]=o[k]; });
+  }catch(e){}
+}
+function persistLocalImages(){
+  try{ localStorage.setItem(IMG_LOCAL_KEY, JSON.stringify(IMAGES)); return true; }
+  catch(e){ toast("This phone has no space to save the picture."); return false; }
+}
+function imgPut(id,data){
+  IMAGES[id]=data;
+  if(imgUsesCloud()){
+    CLOUD.fs.setDoc(CLOUD.fs.doc(CLOUD.db,IMG_COLL,id),{data}).catch(onCloudError);
+  }else persistLocalImages();
+}
+function imgDelete(id){
+  if(!id) return;
+  delete IMAGES[id];
+  if(imgUsesCloud()){
+    CLOUD.fs.deleteDoc(CLOUD.fs.doc(CLOUD.db,IMG_COLL,id)).catch(onCloudError);
+  }else persistLocalImages();
+}
+function imgClearAll(){ Object.keys(IMAGES).forEach(k=>delete IMAGES[k]); imagesSig=""; }
+
+// Called by the cloud listener whenever the pictures in the cloud change
+function onRemoteImages(snap){
+  const m={};
+  snap.forEach(d=>{ const v=d.data()&&d.data().data; if(typeof v==="string" && IMG_OK.test(v)) m[d.id]=v; });
+  const sig=Object.keys(m).sort().map(k=>k+":"+m[k].length).join("|");
+  if(sig===imagesSig) return;
+  imagesSig=sig;
+  imgClearAll(); imagesSig=sig;
+  Object.assign(IMAGES,m);
+  updateQuestionImage();
+  if(document.getElementById("manageModal").classList.contains("show")) renderManage();
+}
+
+/* ---------- shrinking a picture ---------- */
+function fileToDataUrl(file){
+  return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=()=>rej(new Error("read")); r.readAsDataURL(file); });
+}
+function loadImageEl(src){
+  return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=()=>rej(new Error("decode")); im.src=src; });
+}
+async function compressImage(file){
+  if(!file || !/^image\//.test(file.type||"")) throw new Error("notimage");
+  const im=await loadImageEl(await fileToDataUrl(file));
+  const W=im.naturalWidth||im.width, H=im.naturalHeight||im.height;
+  if(!W || !H) throw new Error("decode");
+  let maxSide=1000, q=0.8;
+  for(let i=0;i<7;i++){
+    const sc=Math.min(1,maxSide/Math.max(W,H));
+    const c=document.createElement("canvas");
+    c.width=Math.max(1,Math.round(W*sc)); c.height=Math.max(1,Math.round(H*sc));
+    const ctx=c.getContext("2d");
+    ctx.fillStyle="#ffffff"; ctx.fillRect(0,0,c.width,c.height);   // so see-through PNGs do not turn black
+    ctx.drawImage(im,0,0,c.width,c.height);
+    const out=c.toDataURL("image/jpeg",q);
+    if(IMG_OK.test(out) && out.length<=IMG_MAX_CHARS) return out;
+    maxSide=Math.round(maxSide*0.8); q=Math.max(0.5,q-0.06);
+  }
+  throw new Error("toobig");
+}
+function imageErrorText(e){
+  const m=e&&e.message;
+  if(m==="notimage") return "Please choose a picture file (JPG or PNG).";
+  if(m==="toobig") return "This picture is too big. Try a smaller one.";
+  return "This picture could not be opened. Try a JPG or PNG.";
+}
+
+/* ---------- showing pictures ---------- */
+function questionImageHtml(q){
+  if(!q || !q.imageId) return "";
+  const src=IMAGES[q.imageId];
+  if(src) return `<img class="q-img" src="${src}" alt="Question picture" onclick="openLightbox('${q.imageId}')">`;
+  return `<div class="q-img-loading">${CLOUD.failed ? "Picture unavailable (no connection)" : "Loading picture…"}</div>`;
+}
+function thumbHtml(q){
+  if(!q || !q.imageId) return "";
+  const src=IMAGES[q.imageId];
+  return src ? `<img class="q-thumb" src="${src}" alt="Question picture" onclick="openLightbox('${q.imageId}')">` : `<div class="student-id" style="margin-top:6px">Loading picture…</div>`;
+}
+function updateQuestionImage(){
+  const wrap=document.getElementById("questionImageWrap"); if(!wrap) return;
+  if(!activeQuestionId){ wrap.innerHTML=""; return; }
+  const lab=currentLab();
+  const q=lab && lab.questions.find(x=>x.id===activeQuestionId);
+  wrap.innerHTML=questionImageHtml(q);
+}
+function openLightbox(id){
+  const src=IMAGES[id]; if(!src) return;
+  document.getElementById("lightboxImg").src=src;
+  document.getElementById("lightbox").classList.add("show");
+}
+function closeLightbox(){
+  document.getElementById("lightbox").classList.remove("show");
+  document.getElementById("lightboxImg").removeAttribute("src");
+}
+
+/* ---------- picture for a NEW question ---------- */
+async function pickNewQuestionImage(input){
+  const f=input.files && input.files[0];
+  input.value="";
+  if(!f) return;
+  toast("Preparing picture…");
+  try{ pendingNewImage=await compressImage(f); }
+  catch(e){ toast(imageErrorText(e)); return; }
+  renderNewImagePreview();
+  toast("Picture ready. Now tap + Add Question.");
+}
+function clearNewQuestionImage(){ pendingNewImage=null; renderNewImagePreview(); }
+function renderNewImagePreview(){
+  const box=document.getElementById("newQuestionImagePreview"); if(!box) return;
+  box.innerHTML = pendingNewImage
+    ? `<img class="q-thumb" src="${pendingNewImage}" alt="Picture preview"><div style="margin-top:8px"><button class="smallbtn" onclick="clearNewQuestionImage()">Remove picture</button></div>`
+    : "";
+}
+
+/* ---------- picture for an EXISTING question ---------- */
+function pickImageFor(qid){
+  const lab=currentLab(); if(!lab) return;
+  imageTarget={labId:lab.id,qid};
+  document.getElementById("qImagePicker").click();
+}
+async function onQuestionImagePicked(input){
+  const f=input.files && input.files[0];
+  input.value="";
+  const t=imageTarget; imageTarget=null;
+  if(!f || !t) return;
+  toast("Preparing picture…");
+  let data;
+  try{ data=await compressImage(f); }
+  catch(e){ toast(imageErrorText(e)); return; }
+  const lab=state.labs.find(l=>l.id===t.labId);
+  const q=lab && lab.questions.find(x=>x.id===t.qid);
+  if(!q){ toast("That question no longer exists."); return; }
+  const old=q.imageId;
+  q.imageId="img"+Date.now()+Math.random().toString(36).slice(2,6);
+  imgPut(q.imageId,data);
+  if(old) imgDelete(old);
+  save(); renderManage();
+  toast("Picture saved.");
+}
+function removeQuestionImage(qid){
+  const lab=currentLab();
+  const q=lab && lab.questions.find(x=>x.id===qid);
+  if(!q || !q.imageId) return;
+  imgDelete(q.imageId);
+  delete q.imageId;
+  save(); renderManage();
+  toast("Picture removed.");
+}
+
+if(!cloudConfigured()) loadLocalImages();
 if(cloudConfigured()) document.body.classList.add("cloud-locked");
 render();
 cloudInit();
