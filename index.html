@@ -55,9 +55,17 @@
   .btn.primary{background:linear-gradient(135deg,var(--green2),var(--green));color:#07160f;border:none}
   .btn.danger{background:#3b1d2a;border-color:#6a2a42;color:#ffd9e4}
   .btn.gold{background:#3a2e10;border-color:#6a5517;color:#ffe79d}
-  .layout{
-    margin-top:18px;display:grid;grid-template-columns:260px minmax(0,1fr) 310px;gap:18px;align-items:start
-  }
+  .layout{margin-top:14px;display:block}
+  .tabbar{display:flex;gap:8px;margin-top:14px}
+  .tabbtn{flex:1;padding:13px 10px;border-radius:14px;border:1px solid var(--line);background:#121c35;color:#c6d0ec;font-weight:800;font-size:15px;text-align:center}
+  .tabbtn.active{background:linear-gradient(135deg,var(--green2),var(--green));color:#07160f;border-color:transparent}
+  .pick-list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;margin-top:12px}
+  .pick-item{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:#121c35;color:#fff}
+  .pick-item small{display:block;color:var(--muted);margin-top:2px}
+  .pick-item.current{border-color:rgba(56,217,138,.55);background:rgba(56,217,138,.10)}
+  .score-row[data-sid]{cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;transition:transform .15s,border-color .15s}
+  .score-row.pressing{transform:scale(.98);border-color:rgba(56,217,138,.7)}
+  .hold-hint{margin:12px 0 0;color:var(--muted);font-size:13px}
   .panel{
     background:linear-gradient(180deg,rgba(20,30,56,.96),rgba(15,23,44,.98));
     border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
@@ -313,23 +321,16 @@
     </div>
     <div class="top-actions">
       <span id="cloudPill" class="cloud-pill"></span>
-      <button class="btn" onclick="openStudentModal()">+ Student</button>
-      <button class="btn gold" onclick="restartBoard()">Restart for New Group</button>
       <button class="btn primary" onclick="openManageModal()">Instructor Tools</button>
     </div>
   </header>
 
+  <div class="tabbar">
+    <button id="navGame" class="tabbtn active" onclick="showView('game')">🎮 Game</button>
+    <button id="navScores" class="tabbtn" onclick="showView('scores')">🏆 Live Score</button>
+  </div>
+
   <div class="layout">
-    <aside class="panel side">
-      <div class="section-title">Navigation</div>
-      <button id="navGame" class="navbtn active" onclick="showView('game')">🎮 Game Board</button>
-      <button id="navStudents" class="navbtn" onclick="showView('students')">👤 Student Accounts</button>
-      <button id="navScores" class="navbtn" onclick="showView('scores')">🏆 Live Score</button>
-
-      <div class="section-title" style="margin-top:20px">Labs</div>
-      <div id="labList" class="lab-list"></div>
-    </aside>
-
     <main class="panel main">
       <section id="gameView">
         <div class="hero">
@@ -363,35 +364,16 @@
         <div id="emptyBoard" class="empty" style="display:none">No questions in this lab yet. Use Instructor Tools to add some.</div>
       </section>
 
-      <section id="studentsView" style="display:none">
-        <div class="hero">
-          <div><span class="badge">ACCOUNTS</span><h2>Student Bank Accounts</h2><p>Create a student once, then keep their winnings across lab rounds.</p></div>
-          <button class="btn primary" onclick="openStudentModal()">+ Create Student Account</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Student ID</th><th>Name</th><th>Balance</th><th>Answers</th><th>Action</th></tr></thead>
-            <tbody id="studentsTable"></tbody>
-          </table>
-        </div>
-      </section>
-
       <section id="scoresView" style="display:none">
         <div class="hero">
-          <div><span class="badge">LIVE</span><h2>Live Scoreboard</h2><p>Balances update immediately after each correct answer.</p></div>
+          <div><div class="inline"><span class="badge">LIVE</span><span class="badge" id="studentCountBadge">0 students</span></div><h2>Live Scoreboard</h2><p>Balances update immediately after each correct answer.</p></div>
           <button class="btn" onclick="toggleFullscreen()">⛶ Full Screen</button>
         </div>
-        <div id="bigScoreList" class="score-list" style="margin-top:18px"></div>
+        <p class="hold-hint">Press and hold a student to edit or remove them.</p>
+        <div id="bigScoreList" class="score-list" style="margin-top:12px"></div>
       </section>
     </main>
 
-    <aside class="panel right">
-      <div class="inline" style="justify-content:space-between">
-        <div class="section-title" style="margin:0">Live Score</div>
-        <span class="badge" id="studentCountBadge">0 students</span>
-      </div>
-      <div id="scoreList" class="score-list" style="margin-top:12px"></div>
-    </aside>
   </div>
 </div>
 
@@ -412,32 +394,14 @@
 
 <div class="modal-backdrop" id="pickStudentModal">
   <div class="modal">
-    <h3>Who is playing?</h3>
-    <p>Select the student before revealing the question.</p>
+    <h3>Select student</h3>
     <div class="field">
-      <label>Student account</label>
-      <select id="pickStudentSelect"></select>
+      <label for="pickSearch">Search by name or ID</label>
+      <input id="pickSearch" type="search" autocomplete="off" placeholder="Type a name or ID" oninput="renderPickList()" onkeydown="if(event.key==='Enter')pickFirstMatch()">
     </div>
+    <div id="pickList" class="pick-list"></div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('pickStudentModal')">Cancel</button>
-      <button class="btn primary" onclick="confirmStudentSelection()">Select Student</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-backdrop" id="questionModal">
-  <div class="modal">
-    <div class="inline" style="justify-content:space-between">
-      <span class="badge" id="questionLabBadge">LAB</span>
-      <div class="value" id="questionValue">$0</div>
-    </div>
-    <h3 style="margin-top:18px">Question</h3>
-    <p id="questionText" style="font-size:20px;color:white;line-height:1.45;font-weight:800"></p>
-    <div id="questionImageWrap"></div>
-    <div class="active-student" id="questionStudent"></div>
-    <div class="answer-actions">
-      <button class="answer-btn wrong" onclick="gradeAnswer(false)">✕ False / Incorrect</button>
-      <button class="answer-btn correct" onclick="gradeAnswer(true)">✓ Correct Answer</button>
     </div>
   </div>
 </div>
@@ -653,20 +617,10 @@ function money(n){ return "$" + Number(n||0).toFixed(0); }
 function render(){
   renderLabs();
   renderGame();
-  renderStudents();
   renderScores();
   renderManage();
 }
 function renderLabs(){
-  const el=document.getElementById("labList");
-  el.innerHTML="";
-  state.labs.forEach(l=>{
-    const b=document.createElement("button");
-    b.className="lab-pill"+(l.id===state.currentLabId?" active":"");
-    b.innerHTML=`<b>${escapeHtml(l.name)}</b><small>${l.questions.length} question${l.questions.length===1?"":"s"} · Round ${l.round||1}</small>`;
-    b.onclick=()=>switchLab(l.id);
-    el.appendChild(b);
-  });
 
   const selector=document.getElementById("labSelector");
   if(selector){
@@ -686,12 +640,13 @@ function renderGame(){
   document.getElementById("statStudents").textContent=state.students.length;
   const a=activeStudent();
   const box=document.getElementById("activeStudentBox");
+  const btns=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+    <button class="btn primary" onclick="openPickStudentModal()">${a?"Change student":"Select student"}</button>
+    <button class="btn" onclick="openStudentModal()">+ Create student account</button></div>`;
   if(a){
-    box.innerHTML=`<span>Active student</span><b>${escapeHtml(a.name)}</b><span>ID: ${escapeHtml(a.studentId)} · Balance: ${money(a.balance)}</span>
-    <button class="smallbtn" style="margin-top:8px" onclick="openPickStudentModal()">Change student</button>`;
+    box.innerHTML=`<span>Active student</span><b>${escapeHtml(a.name)}</b><span>ID: ${escapeHtml(a.studentId)} · Balance: ${money(a.balance)}</span>${btns}`;
   }else{
-    box.innerHTML=`<span>Active student</span><b>No student selected</b><span>Select a student before opening a card.</span>
-    <button class="smallbtn" style="margin-top:8px" onclick="openPickStudentModal()">Select student</button>`;
+    box.innerHTML=`<span>Active student</span><b>No student selected</b><span>Select a student before opening a card.</span>${btns}`;
   }
 
   const cards=document.getElementById("cards");
@@ -717,34 +672,17 @@ function renderGame(){
     cards.appendChild(btn);
   });
 }
-function renderStudents(){
-  const tbody=document.getElementById("studentsTable");
-  tbody.innerHTML="";
-  if(!state.students.length){
-    tbody.innerHTML=`<tr><td colspan="5" style="color:#9aa7c7;text-align:center;padding:30px">No student accounts yet.</td></tr>`;
-    return;
-  }
-  state.students.forEach(s=>{
-    const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${escapeHtml(s.studentId)}</td><td><b>${escapeHtml(s.name)}</b></td><td class="cash">${money(s.balance)}</td>
-      <td>${(s.history||[]).filter(h=>h.type!=="adjust").length}</td>
-      <td style="white-space:nowrap"><button class="smallbtn" onclick="openAccount('${s.id}')">Open / Edit</button> <button class="smallbtn" onclick="deleteStudent('${s.id}')">Delete</button></td>`;
-    tbody.appendChild(tr);
-  });
-}
 function renderScores(){
   const sorted=[...state.students].sort((a,b)=>b.balance-a.balance || a.name.localeCompare(b.name));
   document.getElementById("studentCountBadge").textContent=`${sorted.length} student${sorted.length===1?"":"s"}`;
-  const mini=document.getElementById("scoreList");
   const big=document.getElementById("bigScoreList");
   const rows=sorted.length ? sorted.map((s,i)=>scoreRow(s,i)).join("") :
     `<div class="empty" style="margin-top:0;padding:24px">No scores yet.</div>`;
-  mini.innerHTML=rows;
   big.innerHTML=rows;
 }
 function scoreRow(s,i){
   const medal=i===0?"🥇":i===1?"🥈":i===2?"🥉":String(i+1);
-  return `<div class="score-row" onclick="openAccount('${s.id}')" style="cursor:pointer">
+  return `<div class="score-row" data-sid="${s.id}">
     <div class="rank">${medal}</div><div><div class="student-name">${escapeHtml(s.name)}</div><div class="student-id">${escapeHtml(s.studentId)}</div></div>
     <div class="cash">${money(s.balance)}</div></div>`;
 }
@@ -858,14 +796,24 @@ function createStudent(){
 }
 function openPickStudentModal(){
   if(!state.students.length){ openStudentModal(); toast("Create a student account first."); return; }
-  const sel=document.getElementById("pickStudentSelect");
-  sel.innerHTML=state.students.map(s=>`<option value="${s.id}" ${s.id===state.activeStudentId?"selected":""}>${escapeHtml(s.name)} — ${escapeHtml(s.studentId)}</option>`).join("");
+  document.getElementById("pickSearch").value="";
+  renderPickList();
   document.getElementById("pickStudentModal").classList.add("show");
+  setTimeout(()=>document.getElementById("pickSearch").focus(),100);
 }
-function confirmStudentSelection(){
-  state.activeStudentId=document.getElementById("pickStudentSelect").value;
-  save(); closeModal("pickStudentModal"); render();
+function pickMatches(){
+  const q=document.getElementById("pickSearch").value.trim().toLowerCase();
+  const list=[...state.students].sort((x,y)=>x.name.localeCompare(y.name));
+  return q ? list.filter(s=>s.name.toLowerCase().includes(q)||String(s.studentId).toLowerCase().includes(q)) : list;
 }
+function renderPickList(){
+  const m=pickMatches();
+  document.getElementById("pickList").innerHTML = m.length
+    ? m.map(s=>`<button class="pick-item${s.id===state.activeStudentId?" current":""}" onclick="chooseStudent('${s.id}')"><span><b>${escapeHtml(s.name)}</b><small>ID: ${escapeHtml(s.studentId)}</small></span><span class="cash">${money(s.balance)}</span></button>`).join("")
+    : `<div class="empty" style="padding:20px;margin:0">No student matches.</div>`;
+}
+function pickFirstMatch(){ const m=pickMatches(); if(m.length===1) chooseStudent(m[0].id); }
+function chooseStudent(id){ state.activeStudentId=id; save(); closeModal("pickStudentModal"); render(); }
 function openQuestion(qid){
   const student=activeStudent();
   if(!student){ openPickStudentModal(); return; }
@@ -1053,7 +1001,7 @@ function deleteStudent(id){
   toast(`${s.name} deleted.`);
 }
 function showView(v){
-  ["game","students","scores"].forEach(x=>{
+  ["game","scores"].forEach(x=>{
     document.getElementById(x+"View").style.display=x===v?"block":"none";
     document.getElementById("nav"+x[0].toUpperCase()+x.slice(1)).classList.toggle("active",x===v);
   });
@@ -1534,6 +1482,28 @@ cloudInit();
 </script>
 
 <div id="funStage" onclick="stopFun()"></div>
+<script>
+/* Press and hold a student on the Live Score page to edit or remove them */
+(function(){
+  var list=document.getElementById("bigScoreList"); if(!list) return;
+  var timer=null, sx=0, sy=0;
+  function unpress(){ var r=list.querySelectorAll(".pressing"); for(var i=0;i<r.length;i++) r[i].classList.remove("pressing"); }
+  function cancel(){ clearTimeout(timer); timer=null; unpress(); }
+  function rowOf(e){ return e.target && e.target.closest ? e.target.closest("[data-sid]") : null; }
+  list.addEventListener("pointerdown",function(e){
+    var r=rowOf(e); if(!r) return;
+    cancel(); sx=e.clientX; sy=e.clientY; r.classList.add("pressing");
+    var id=r.getAttribute("data-sid");
+    timer=setTimeout(function(){ timer=null; unpress(); try{ if(navigator.vibrate) navigator.vibrate(35); }catch(x){} openAccount(id); },550);
+  });
+  list.addEventListener("pointermove",function(e){ if(timer && (Math.abs(e.clientX-sx)>10 || Math.abs(e.clientY-sy)>10)) cancel(); });
+  ["pointerup","pointercancel","pointerleave"].forEach(function(ev){ list.addEventListener(ev,cancel); });
+  list.addEventListener("contextmenu",function(e){
+    var r=rowOf(e); if(!r) return;
+    e.preventDefault(); cancel(); openAccount(r.getAttribute("data-sid"));
+  });
+})();
+</script>
 <script>
 /* Funny answer animations. Separate script: if anything here fails, the game still works. */
 var FAC=null;
