@@ -406,6 +406,30 @@
   </div>
 </div>
 
+<!-- The question popup is required by openQuestion() and gradeAnswer(). -->
+<div class="modal-backdrop" id="questionModal" role="dialog" aria-modal="true" aria-labelledby="questionModalTitle">
+  <div class="modal">
+    <div class="inline" style="justify-content:space-between;gap:12px;margin-bottom:12px">
+      <span class="badge" id="questionLabBadge">LAB</span>
+      <span class="value" id="questionValue" style="margin-top:0">$0</span>
+    </div>
+    <h3 id="questionModalTitle">Your Question</h3>
+    <div class="manage-card" style="margin-top:12px">
+      <div class="qtext" id="questionText"></div>
+      <div id="questionImageWrap"></div>
+    </div>
+    <div class="active-student" id="questionStudent"></div>
+    <p style="margin:14px 0 0">Choose whether the student's answer is correct to record the result.</p>
+    <div class="answer-actions">
+      <button type="button" class="answer-btn correct" onclick="gradeAnswer(true)">✓ Correct</button>
+      <button type="button" class="answer-btn wrong" onclick="gradeAnswer(false)">✕ Incorrect</button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn" onclick="closeModal('questionModal')">Cancel — do not use card</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="manageModal">
   <div class="modal">
     <h3>Instructor Tools</h3>
